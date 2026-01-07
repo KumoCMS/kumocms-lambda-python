@@ -1,0 +1,51 @@
+{
+    "name": "kumocms-lambda-python",
+    "version": "1.1.0",
+    "description": "Kumo CMS Lambda Functions",
+    "devDependencies": {
+        "semantic-release": "^21.0.0",
+        "@semantic-release/github": "^9.0.0",
+        "@semantic-release/commit-analyzer": "^10.0.0",
+        "@semantic-release/release-notes-generator": "^11.0.0",
+        "@semantic-release/changelog": "^6.0.0",
+        "@semantic-release/git": "^10.0.0",
+        "@semantic-release/npm": "^10.0.0"
+    },
+    "release": {
+        "branches": [
+            "main"
+        ],
+        "plugins": [
+            "@semantic-release/commit-analyzer",
+            "@semantic-release/release-notes-generator",
+            "@semantic-release/changelog",
+            [
+                "@semantic-release/npm",
+                {
+                    "npmPublish": false
+                }
+            ],
+            [
+                "@semantic-release/github",
+                {
+                    "assets": [
+                        {
+                            "path": "lambda_function.zip",
+                            "label": "Lambda Function Zip"
+                        }
+                    ]
+                }
+            ],
+            [
+                "@semantic-release/git",
+                {
+                    "assets": [
+                        "CHANGELOG.md",
+                        "package.json"
+                    ],
+                    "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+                }
+            ]
+        ]
+    }
+}
