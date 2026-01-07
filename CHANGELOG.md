@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/KumoCMS/kumocms-lambda-python/compare/v1.0.0...v1.1.0) (2026-01-07)
+
+
+### Features
+
+* fix git token 2 ([864ab79](https://github.com/KumoCMS/kumocms-lambda-python/commit/864ab79576dbe3ca72a9d1fb9b4eb5fe69ee2d85))
+
 # 1.0.0 (2026-01-07)
 
 
