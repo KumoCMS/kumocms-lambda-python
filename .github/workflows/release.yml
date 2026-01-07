@@ -14,6 +14,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false # Recommended when using a PAT
+          token: ${{ secrets.GIT_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
