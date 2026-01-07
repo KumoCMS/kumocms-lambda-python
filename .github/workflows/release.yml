@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false # Recommended when using a PAT
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.14'
+
+      - name: Run unit tests and linting
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt ruff mypy types-requests types-retry boto3-stubs[essential]
+          export PYTHONPATH=$PYTHONPATH:$(pwd)/src/handlers/api:$(pwd)/src/handlers/events:$(pwd)/src/common
+          
+          # Linting
+          ruff check .
+          ruff format --check .
+          
+          # Type checking
+          mypy src
+          
+          # Tests
+          pytest
+
+      - name: Build Lambda Package
+        run: |
+          mkdir package
+          pip install -r requirements.txt -t package/
+          cp -r src/* package/
+          rm -rf package/__pycache__
+          cd package
+          zip -r ../lambda_function.zip .
+          cd ..
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GIT_TOKEN }}
+        run: npx semantic-release
