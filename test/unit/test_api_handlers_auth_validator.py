@@ -24,23 +24,24 @@ def reset_cache_and_env():
     """Reset the secret cache and environment before each test."""
     # Save original environment
     original_env = os.environ.get("API_KEY_SECRET_PATH")
-    
+
     # Set environment variable
     os.environ["API_KEY_SECRET_PATH"] = "test-secret-path"
-    
+
     # Reset cache
     auth_validator._secret_cache = None
-    
+
     # Reload module to pick up environment variable
     import importlib
+
     importlib.reload(auth_validator)
-    
+
     yield
-    
+
     # Restore original environment
     if original_env is not None:
         os.environ["API_KEY_SECRET_PATH"] = original_env
-    
+
     # Reset cache
     auth_validator._secret_cache = None
 
@@ -66,7 +67,9 @@ def mock_context():
     """Mock Lambda context."""
     context = Mock()
     context.function_name = "test-auth-validator"
-    context.invoked_function_arn = "arn:aws:lambda:us-east-1:123456789012:function:test-auth-validator"
+    context.invoked_function_arn = (
+        "arn:aws:lambda:us-east-1:123456789012:function:test-auth-validator"
+    )
     context.request_id = "test-request-id"
     return context
 
@@ -83,9 +86,7 @@ class TestGetApiKeys:
         result = auth_validator.get_api_keys()
 
         assert result == valid_secret
-        mock_secrets_manager.get_secret_value.assert_called_once_with(
-            SecretId="test-secret-path"
-        )
+        mock_secrets_manager.get_secret_value.assert_called_once_with(SecretId="test-secret-path")
 
     def test_get_api_keys_caching(self, mock_secrets_manager, valid_secret):
         """Test that API keys are cached after first retrieval."""
@@ -132,18 +133,14 @@ class TestGetApiKeys:
 
     def test_get_api_keys_invalid_json(self, mock_secrets_manager):
         """Test error when secret contains invalid JSON."""
-        mock_secrets_manager.get_secret_value.return_value = {
-            "SecretString": "not-valid-json"
-        }
+        mock_secrets_manager.get_secret_value.return_value = {"SecretString": "not-valid-json"}
 
         with pytest.raises(Exception, match="Configuration error"):
             auth_validator.get_api_keys()
 
     def test_get_api_keys_secrets_manager_error(self, mock_secrets_manager):
         """Test error handling when Secrets Manager fails."""
-        mock_secrets_manager.get_secret_value.side_effect = Exception(
-            "Secrets Manager unavailable"
-        )
+        mock_secrets_manager.get_secret_value.side_effect = Exception("Secrets Manager unavailable")
 
         with pytest.raises(Exception, match="Configuration error"):
             auth_validator.get_api_keys()
@@ -151,9 +148,7 @@ class TestGetApiKeys:
     def test_get_api_keys_only_current_key(self, mock_secrets_manager):
         """Test retrieval when only current API key is present."""
         secret = {"api_key": "current-key-only"}
-        mock_secrets_manager.get_secret_value.return_value = {
-            "SecretString": json.dumps(secret)
-        }
+        mock_secrets_manager.get_secret_value.return_value = {"SecretString": json.dumps(secret)}
 
         result = auth_validator.get_api_keys()
 
@@ -165,9 +160,7 @@ class TestGetApiKeys:
 class TestLambdaHandler:
     """Test the lambda_handler function."""
 
-    def test_auth_success_with_current_key(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_auth_success_with_current_key(self, mock_secrets_manager, valid_secret, mock_context):
         """Test successful authentication with current API key."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -186,9 +179,7 @@ class TestLambdaHandler:
         assert result["context"]["authenticated"] == "true"
         assert result["context"]["key_type"] == "current"
 
-    def test_auth_success_with_previous_key(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_auth_success_with_previous_key(self, mock_secrets_manager, valid_secret, mock_context):
         """Test successful authentication with previous API key (rotation support)."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -223,9 +214,7 @@ class TestLambdaHandler:
         assert result["principalId"] == "api-user"
         assert result["context"]["key_type"] == "current"
 
-    def test_auth_failure_invalid_key(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_auth_failure_invalid_key(self, mock_secrets_manager, valid_secret, mock_context):
         """Test authentication failure with invalid API key."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -248,9 +237,7 @@ class TestLambdaHandler:
         with pytest.raises(Exception, match="Unauthorized"):
             auth_validator.lambda_handler(event, mock_context)
 
-    def test_auth_fallback_to_headers(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_auth_fallback_to_headers(self, mock_secrets_manager, valid_secret, mock_context):
         """Test token extraction from headers as fallback."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -268,9 +255,7 @@ class TestLambdaHandler:
 
     def test_auth_failure_secrets_manager_error(self, mock_secrets_manager, mock_context):
         """Test authentication failure when Secrets Manager fails."""
-        mock_secrets_manager.get_secret_value.side_effect = Exception(
-            "Secrets Manager error"
-        )
+        mock_secrets_manager.get_secret_value.side_effect = Exception("Secrets Manager error")
 
         event = {
             "authorizationToken": "Bearer some-key",
@@ -280,9 +265,7 @@ class TestLambdaHandler:
         with pytest.raises(Exception, match="Unauthorized"):
             auth_validator.lambda_handler(event, mock_context)
 
-    def test_auth_case_insensitive_bearer(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_auth_case_insensitive_bearer(self, mock_secrets_manager, valid_secret, mock_context):
         """Test that Bearer prefix is case-insensitive."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -375,9 +358,7 @@ class TestGeneratePolicy:
 class TestAuthValidatorIntegration:
     """Integration tests for the auth validator."""
 
-    def test_full_auth_flow_current_key(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_full_auth_flow_current_key(self, mock_secrets_manager, valid_secret, mock_context):
         """Test complete authentication flow with current API key."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -402,9 +383,7 @@ class TestAuthValidatorIntegration:
         assert result["context"]["authenticated"] == "true"
         assert result["context"]["key_type"] == "current"
 
-    def test_full_auth_flow_previous_key(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_full_auth_flow_previous_key(self, mock_secrets_manager, valid_secret, mock_context):
         """Test complete authentication flow with previous API key."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
@@ -412,7 +391,9 @@ class TestAuthValidatorIntegration:
 
         event = {
             "authorizationToken": "Bearer old-api-key-67890",
-            "methodArn": "arn:aws:execute-api:us-east-1:123456789012:abcdef123/prod/DELETE/documents/123",
+            "methodArn": (
+                "arn:aws:execute-api:us-east-1:123456789012:abcdef123/prod/DELETE/documents/123"
+            ),
         }
 
         result = auth_validator.lambda_handler(event, mock_context)
@@ -421,9 +402,7 @@ class TestAuthValidatorIntegration:
         assert result["context"]["key_type"] == "previous"
         assert result["policyDocument"]["Statement"][0]["Effect"] == "Allow"
 
-    def test_multiple_requests_use_cache(
-        self, mock_secrets_manager, valid_secret, mock_context
-    ):
+    def test_multiple_requests_use_cache(self, mock_secrets_manager, valid_secret, mock_context):
         """Test that multiple requests use cached secrets."""
         mock_secrets_manager.get_secret_value.return_value = {
             "SecretString": json.dumps(valid_secret)
