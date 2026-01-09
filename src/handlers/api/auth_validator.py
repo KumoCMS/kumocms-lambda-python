@@ -1,18 +1,65 @@
+import json
 import logging
 import os
 from typing import Any
 
 import boto3
-from boto3.dynamodb.conditions import Key
 
 # Configure logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Initialize AWS clients
-USERS_TABLE = os.environ.get("USERS_TABLE", "")
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(USERS_TABLE)
+SECRET_PATH = os.environ.get("API_KEY_SECRET_PATH", "")
+secrets_manager = boto3.client("secretsmanager")
+
+# Cache for the secret to avoid repeated API calls
+_secret_cache: dict[str, Any] | None = None
+
+
+def get_api_keys() -> dict[str, str]:
+    """Retrieve API keys from AWS Secrets Manager.
+
+    Returns:
+        Dictionary containing api_key and api_key_previous.
+
+    Raises:
+        Exception: If secret retrieval fails or secret format is invalid.
+    """
+    global _secret_cache
+
+    # Return cached secret if available
+    if _secret_cache is not None:
+        return _secret_cache
+
+    if not SECRET_PATH:
+        logger.error("API_KEY_SECRET_PATH environment variable not set")
+        raise Exception("Configuration error")
+
+    try:
+        response = secrets_manager.get_secret_value(SecretId=SECRET_PATH)
+        secret_string = response.get("SecretString")
+
+        if not secret_string:
+            logger.error("Secret value is empty")
+            raise Exception("Configuration error")
+
+        secret_data = json.loads(secret_string)
+
+        # Validate secret structure
+        if "api_key" not in secret_data:
+            logger.error("Secret missing required 'api_key' field")
+            raise Exception("Configuration error")
+
+        # Cache the secret
+        _secret_cache = secret_data
+        logger.info("Successfully retrieved and cached API keys from Secrets Manager")
+
+        return secret_data
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve secret from Secrets Manager: {e}")
+        raise Exception("Configuration error") from e
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -46,31 +93,31 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         logger.info(f"Validating API key starting with: {token[:4]}...")
 
-        # Query DynamoDB api-key-index
+        # Get API keys from Secrets Manager
         try:
-            response = table.query(
-                IndexName="api-key-index", KeyConditionExpression=Key("api_key").eq(token)
-            )
+            api_keys = get_api_keys()
         except Exception as e:
-            logger.error(f"DynamoDB query failed for API Key validation: {e}")
+            logger.error(f"Failed to retrieve API keys: {e}")
             raise Exception("Unauthorized") from e
 
-        if not response.get("Items"):
+        # Validate token against both current and previous API keys
+        valid_api_key = api_keys.get("api_key")
+        previous_api_key = api_keys.get("api_key_previous")
+
+        if token != valid_api_key and token != previous_api_key:
             logger.warning("Auth error: Invalid API Key")
             raise Exception("Unauthorized") from None
 
-        user = response["Items"][0]
-        username = user["username"]
-        role = user.get("role", "user")
+        # Determine which key was used
+        key_type = "current" if token == valid_api_key else "previous"
+        logger.info(f"Authorized with {key_type} API key")
 
-        logger.info(f"Authorized user: {str(username)}, role: {str(role)}")
-
-        # Generate IAM policy
+        # Generate IAM policy with generic principal
         policy = generate_policy(
-            str(username),
+            "api-user",
             "Allow",
             event["methodArn"],
-            {"username": username, "role": role},
+            {"authenticated": "true", "key_type": key_type},
         )
 
         return policy
