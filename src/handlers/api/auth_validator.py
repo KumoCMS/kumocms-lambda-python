@@ -44,7 +44,7 @@ def get_api_keys() -> dict[str, str]:
             logger.error("Secret value is empty")
             raise Exception("Configuration error")
 
-        secret_data = json.loads(secret_string)
+        secret_data: dict[str, str] = json.loads(secret_string)
 
         # Validate secret structure
         if "api_key" not in secret_data:
