@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/KumoCMS/kumocms-lambda-python/compare/v1.1.0...v1.2.0) (2026-01-09)
+
+
+### Features
+
+* change auth validator to use secret manager ([#6](https://github.com/KumoCMS/kumocms-lambda-python/issues/6)) ([4e16dad](https://github.com/KumoCMS/kumocms-lambda-python/commit/4e16dada53c903ab7309be2403b68ba9a5cbcd39))
+
 # [1.1.0](https://github.com/KumoCMS/kumocms-lambda-python/compare/v1.0.0...v1.1.0) (2026-01-07)
 
 
